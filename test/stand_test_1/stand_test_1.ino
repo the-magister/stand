@@ -1,4 +1,4 @@
-// Compile for Adafruit HUZZAH ESP8266 80 MHz, 4M
+// Compile for Adafruit HUZZAH ESP8266 80 MHz, 4M (3M SPI)
 #include<FastLED.h>
 
 #define NUM_LEDS_PER_STRIP 38
