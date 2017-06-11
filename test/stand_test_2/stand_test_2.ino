@@ -75,30 +75,10 @@ CRGBSet CLEG[NUM_CONTROLLERS] = {
 // note that we instantiate the set with the pointer
 CRGB *pctrack[NUM_LEDS];
 CRGBSet CTRACK(pctrack[0], NUM_LEDS);
+// and the reverse
+CRGBSet CTRACKr(CTRACK, -NUM_LEDS);
+// function to set references
 void setCTRACK() {
-  /*
-
-    would be nice to do an assignment like this:
-
-    CTRACK(0*NUM_LEDS_PER_CONTROLLER, 1*NUM_LEDS_PER_CONTROLLER - 1) = & C0(0, NUM_LEDS_PER_CONTROLLER - 1);
-    CTRACK(1*NUM_LEDS_PER_CONTROLLER, 2*NUM_LEDS_PER_CONTROLLER - 1) = & C1r(0, NUM_LEDS_PER_CONTROLLER - 1);
-    CTRACK(2*NUM_LEDS_PER_CONTROLLER, 3*NUM_LEDS_PER_CONTROLLER - 1) = & C3(0, NUM_LEDS_PER_CONTROLLER - 1);
-    CTRACK(3*NUM_LEDS_PER_CONTROLLER, 4*NUM_LEDS_PER_CONTROLLER - 1) = & C2r(0, NUM_LEDS_PER_CONTROLLER - 1);
-
-    but we can't.
-
-    nor can we do something like this:
-
-    for( word i=0;i<NUM_LEDS_PER_CONTROLLER;i++) {
-    CTRACK[0*NUM_LEDS_PER_CONTROLLER+i] = & C0[i];
-    CTRACK[1*NUM_LEDS_PER_CONTROLLER+i] = & C1r[i];
-    CTRACK[2*NUM_LEDS_PER_CONTROLLER+i] = & C3[i];
-    CTRACK[3*NUM_LEDS_PER_CONTROLLER+i] = & C2r[i];
-    }
-
-    so, we resort to pointers.  ugh.
-  */
-
   for ( word i = 0; i < NUM_LEDS_PER_CONTROLLER; i++) {
     pctrack[0 * NUM_LEDS_PER_CONTROLLER + i] = & C0[i];
     pctrack[1 * NUM_LEDS_PER_CONTROLLER + i] = & C1r[i];
@@ -108,6 +88,38 @@ void setCTRACK() {
 
   // so, we've aligned the pointers to correctly address the primary storage,
   // handling the jumping around in the index.
+}
+// define three "little tracks". one each for looping around each leg, and one for looping around the top
+CRGB *pctrackl[NUM_LEDS_LEG*2];
+CRGB *pctrackr[NUM_LEDS_LEG*2];
+CRGB *pctrackt[NUM_LEDS_TOP*4];
+CRGBSet CTRACKL(pctrackl[0], NUM_LEDS_LEG*2);
+CRGBSet CTRACKR(pctrackr[0], NUM_LEDS_LEG*2);
+CRGBSet CTRACKT(pctrackt[0], NUM_LEDS_TOP*4);
+// and the reverse
+CRGBSet CTRACKLr(CTRACKL, -NUM_LEDS_LEG*2);
+CRGBSet CTRACKRr(CTRACKR, -NUM_LEDS_LEG*2);
+CRGBSet CTRACKTr(CTRACKT, -NUM_LEDS_TOP*4);
+// functions to set references
+void setCTRACKL() {
+  for ( word i = 0; i < NUM_LEDS_LEG; i++) {
+    pctrackl[0 * NUM_LEDS_LEG + i] = & CL[1][i];
+    pctrackl[1 * NUM_LEDS_LEG + i] = & CL[2][NUM_LEDS_LEG-1-i];
+  }
+}
+void setCTRACKR() {
+  for ( word i = 0; i < NUM_LEDS_LEG; i++) {
+    pctrackr[0 * NUM_LEDS_LEG + i] = & CR[1][i];
+    pctrackr[1 * NUM_LEDS_LEG + i] = & CR[2][NUM_LEDS_LEG-1-i];
+  }
+}
+void setCTRACKT() {
+  for ( word i = 0; i < NUM_LEDS_TOP; i++) {
+    pctrackt[0 * NUM_LEDS_TOP + i] = & CTOP[1][i];
+    pctrackt[1 * NUM_LEDS_TOP + i] = & CTOP[2][NUM_LEDS_TOP-1-i];
+    pctrackt[2 * NUM_LEDS_TOP + i] = & CTOP[3][i];
+    pctrackt[3 * NUM_LEDS_TOP + i] = & CTOP[4][NUM_LEDS_TOP-1-i];
+  }
 }
 
 void setup() {
@@ -124,8 +136,11 @@ void setup() {
   Serial << F("Size of: CTOP=") << sizeof(CTOP) << endl;
   Serial << F("Size of: CLEG=") << sizeof(CLEG) << endl;
 
-  // set up CTRACK
+  // set up pointers to ease containers
   setCTRACK();
+  setCTRACKL();
+  setCTRACKR();
+  setCTRACKT();
 }
 
 // maybe not execute everything all at once
@@ -143,7 +158,7 @@ void loop() {
     static byte topHue = 0; // current Hue
     static int topHueDelta = 5; // Hue steps
     static fract8 topBlur = 128; // 50% blurring
-    static int topLoc = random8(CTOP[0].size()); // position
+    static int topLoc = random8(CTOP[0].size()); // position. NOTE: NOT using #define's, as I want to work within a container
     static int dir = 1; // directionality
     if ( topLoc + dir > CTOP[0].size() || topLoc + dir < 0) dir *= -1; // swap directions if needed.
     topLoc += dir; // advance location
@@ -177,9 +192,9 @@ void loop() {
   }
 
   if ( RUN_TRACK ) {
-    // 5. send a bright white dot around the track
+    // 5. send a bright white dot around the big track
     static CHSV trackColor = CHSV(HUE_BLUE, 0, 255); // color choice.  bright white.
-    static word trackPos = 0; // current position
+    static word trackPos = random8(CTRACK.size()); // current position
     trackPos++; // increment
     if ( trackPos > CTRACK.size() - 1 ) trackPos = 0; // wrap around
     CTRACK[trackPos] += trackColor; // paint
