@@ -19,7 +19,7 @@
 */
 
 #define NUM_LEDS_TOP 8
-#define NUM_LEDS_LEG 18
+#define NUM_LEDS_LEG 15
 #define NUM_CONTROLLERS 4
 // derive overall dimensions
 #define NUM_LEDS_PER_CONTROLLER (NUM_LEDS_TOP+NUM_LEDS_LEG)
@@ -30,7 +30,7 @@
 #define PORT WS2811_PORTA
 
 // target FPS.  set this low to see what's going on.
-const byte targetFPS = 1;
+const byte targetFPS = 20;
 
 // maximum brightness
 const byte masterBrightness = 255;
@@ -74,9 +74,9 @@ CRGBSet CLEG[NUM_CONTROLLERS] = {
 // define a container that wraps around at the ends of each leg, creating a circuit/track
 // note that we instantiate the set with the pointer
 CRGB *pctrack[NUM_LEDS];
-CRGBSet CTRACK(pctrack[0], NUM_LEDS);
+//CRGBSet CTRACK(pctrack[0], NUM_LEDS);
 // and the reverse
-CRGBSet CTRACKr(CTRACK, -NUM_LEDS);
+//CRGBSet CTRACKr(CTRACK, -NUM_LEDS);
 // function to set references
 void setCTRACK() {
   for ( word i = 0; i < NUM_LEDS_PER_CONTROLLER; i++) {
@@ -141,12 +141,15 @@ void setup() {
   setCTRACKL();
   setCTRACKR();
   setCTRACKT();
+  Serial << F("Setup. complete.") << endl;
+  delay(1000);
+  
 }
 
 // maybe not execute everything all at once
-#define RUN_TOP 1
-#define RUN_LEGS 1
-#define RUN_EXTENT 1
+#define RUN_TOP 0
+#define RUN_LEGS 0
+#define RUN_EXTENT 0
 #define RUN_TRACK 1
 
 void loop() {
@@ -160,7 +163,7 @@ void loop() {
     static fract8 topBlur = 128; // 50% blurring
     static int topLoc = random8(CTOP[0].size()); // position. NOTE: NOT using #define's, as I want to work within a container
     static int dir = 1; // directionality
-    if ( topLoc + dir > CTOP[0].size() || topLoc + dir < 0) dir *= -1; // swap directions if needed.
+    if ( topLoc + dir > CTOP[0].size()-1 || topLoc + dir < 0) dir *= -1; // swap directions if needed.
     topLoc += dir; // advance location
     topHue += topHueDelta; // advance hue
     for ( byte i = 0; i < NUM_CONTROLLERS; i++) {
@@ -174,10 +177,10 @@ void loop() {
     static byte legHue = 0;
     static int legHueDelta = 5;
     legHue++;
-    CTOP[0].fill_rainbow(legHue, legHueDelta); // paint
-    CTOP[1] = CTOP[0]; // mirror
-    CTOP[2].fill_rainbow(legHue + 128, -legHueDelta); // paint, noting we're using the other side of the wheel
-    CTOP[3] = CTOP[1]; // mirror
+    CLEG[0].fill_rainbow(legHue, legHueDelta); // paint
+    CLEG[1] = CLEG[0]; // mirror
+    CLEG[2].fill_rainbow(legHue + 128, -legHueDelta); // paint, noting we're using the other side of the wheel
+    CLEG[3] = CLEG[2]; // mirror
   }
 
   if ( RUN_EXTENT ) {
@@ -193,9 +196,10 @@ void loop() {
 
   if ( RUN_TRACK ) {
     // 5. send a bright white dot around the big track
+    static CRGBSet CTRACK(pctrack[0], NUM_LEDS);
     static CHSV trackColor = CHSV(HUE_BLUE, 0, 255); // color choice.  bright white.
     static word trackPos = random8(CTRACK.size()); // current position
-    trackPos++; // increment
+    trackPos++; // increment    
     if ( trackPos > CTRACK.size() - 1 ) trackPos = 0; // wrap around
     CTRACK[trackPos] += trackColor; // paint
   }
