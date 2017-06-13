@@ -30,13 +30,13 @@
 #define PORT WS2811_PORTA
 
 // target FPS.  set this low to see what's going on.
-const byte targetFPS = 5;
+const byte targetFPS = 50;
 
 // maximum brightness
 const byte masterBrightness = 255;
 
 // fade amount each update
-byte fadeEverything = 255;
+byte fadeEverything = 64;
 
 // see pixelset.h for documention on these classes
 // main container
@@ -76,54 +76,13 @@ CRGBSet CLEG[NUM_CONTROLLERS] = {
 // more exotic containers
 // define a container that wraps around at the ends of each leg, creating a circuit/track
 // note that we instantiate the set with the pointer
-CRGB *pctrack[NUM_LEDS];
-//CRGBSet CTRACK(pctrack[0], NUM_LEDS);
-// and the reverse
-//CRGBSet CTRACKr(CTRACK, -NUM_LEDS);
-// function to set references
-void setCTRACK() {
-  for ( word i = 0; i < NUM_LEDS_PER_CONTROLLER; i++) {
-    pctrack[0 * NUM_LEDS_PER_CONTROLLER + i] = & C0[0];
-    pctrack[1 * NUM_LEDS_PER_CONTROLLER + i] = & leds[2 * NUM_LEDS_PER_CONTROLLER -1 -i];
-    pctrack[2 * NUM_LEDS_PER_CONTROLLER + i] = & C3[i];
-    pctrack[3 * NUM_LEDS_PER_CONTROLLER + i] = & C2[-i];
-  }
+CRGBSet CTRACK[NUM_CONTROLLERS] = { C0, C1r, C3, C2r };
+CRGBSet CTRACKr[NUM_CONTROLLERS] = { C0r, C1, C3r, C2 };
 
-  // so, we've aligned the pointers to correctly address the primary storage,
-  // handling the jumping around in the index.
-}
 // define three "little tracks". one each for looping around each leg, and one for looping around the top
-CRGB *pctrackl[NUM_LEDS_LEG * 2];
-CRGB *pctrackr[NUM_LEDS_LEG * 2];
-CRGB *pctrackt[NUM_LEDS_TOP * 4];
-CRGBSet CTRACKL(pctrackl[0], NUM_LEDS_LEG * 2);
-CRGBSet CTRACKR(pctrackr[0], NUM_LEDS_LEG * 2);
-CRGBSet CTRACKT(pctrackt[0], NUM_LEDS_TOP * 4);
-// and the reverse
-CRGBSet CTRACKLr(CTRACKL, -NUM_LEDS_LEG * 2);
-CRGBSet CTRACKRr(CTRACKR, -NUM_LEDS_LEG * 2);
-CRGBSet CTRACKTr(CTRACKT, -NUM_LEDS_TOP * 4);
-// functions to set references
-void setCTRACKL() {
-  for ( word i = 0; i < NUM_LEDS_LEG; i++) {
-    pctrackl[0 * NUM_LEDS_LEG + i] = & CL[1][i];
-    pctrackl[1 * NUM_LEDS_LEG + i] = & CL[2][NUM_LEDS_LEG - 1 - i];
-  }
-}
-void setCTRACKR() {
-  for ( word i = 0; i < NUM_LEDS_LEG; i++) {
-    pctrackr[0 * NUM_LEDS_LEG + i] = & CR[1][i];
-    pctrackr[1 * NUM_LEDS_LEG + i] = & CR[2][NUM_LEDS_LEG - 1 - i];
-  }
-}
-void setCTRACKT() {
-  for ( word i = 0; i < NUM_LEDS_TOP; i++) {
-    pctrackt[0 * NUM_LEDS_TOP + i] = & CTOP[1][i];
-    pctrackt[1 * NUM_LEDS_TOP + i] = & CTOP[2][NUM_LEDS_TOP - 1 - i];
-    pctrackt[2 * NUM_LEDS_TOP + i] = & CTOP[3][i];
-    pctrackt[3 * NUM_LEDS_TOP + i] = & CTOP[4][NUM_LEDS_TOP - 1 - i];
-  }
-}
+CRGBSet CTRACKL[NUM_CONTROLLERS / 2] = { CL[0], CL[1](CL[1].size()-1,0) };
+CRGBSet CTRACKR[NUM_CONTROLLERS / 2] = { CR[0], CR[1](CR[1].size()-1,0) };
+CRGBSet CTRACKT[NUM_CONTROLLERS] = { CTOP[0], CTOP[1](CTOP[1].size()-1,0), CTOP[3], CTOP[2](CTOP[2].size()-1,0) };
 
 class Cset : public CRGBSet {
   public:
@@ -144,27 +103,19 @@ void setup() {
   Serial << F("Size of: CTOP=") << sizeof(CTOP) << endl;
   Serial << F("Size of: CLEG=") << sizeof(CLEG) << endl;
 
-  // set up pointers to ease containers
-  setCTRACK();
-  setCTRACKL();
-  setCTRACKR();
-  setCTRACKT();
-
-  Serial << F("C0r is reversed? ") << C1r.reversed() << endl;
-  
   Serial << F("Setup. complete.") << endl;
   delay(1000);
 
 }
 
 // maybe not execute everything all at once
-#define RUN_TOP 0
-#define RUN_LEGS 0
+#define RUN_TOP 1
+#define RUN_LEGS 1
 #define RUN_EXTENT 0
 #define RUN_TRACK 1
-#define RUN_LOOPS 0
+#define RUN_LOOPS 1
 
-#define DEBUG_CONTROLLERS 1
+#define DEBUG_CONTROLLERS 0
 
 void loop() {
   // 1. fade everything
@@ -181,7 +132,7 @@ void loop() {
     topLoc += dir; // advance location
     topHue += topHueDelta; // advance hue
     for ( byte i = 0; i < NUM_CONTROLLERS; i++) {
-      CTOP[i][topLoc] += CHSV(topHue, 255, 255); // paint
+      CTOP[i][topLoc] += CHSV(topHue, 255, 128); // paint
       CTOP[i].blur1d(topBlur); // blur, just for visual interest
     }
   }
@@ -192,8 +143,10 @@ void loop() {
     static int legHueDelta = 5;
     legHue++;
     CLEG[0].fill_rainbow(legHue, legHueDelta); // paint
+    CLEG[0].fadeToBlackBy(196);
     CLEG[1] = CLEG[0]; // mirror
     CLEG[2].fill_rainbow(legHue + 128, -legHueDelta); // paint, noting we're using the other side of the wheel
+    CLEG[2].fadeToBlackBy(196);
     CLEG[3] = CLEG[2]; // mirror
   }
 
@@ -210,49 +163,57 @@ void loop() {
 
   if ( RUN_TRACK ) {
     // send a bright white dot around the big track
-    static CRGBSet CTRACK(pctrack, NUM_LEDS); // container, noting that it's instantiated _after_ the setup() has set referencing
     static CHSV trackColor = CHSV(HUE_BLUE, 0, 255); // color choice.  bright white.
-    static word trackPos = random8(CTRACK.size()); // current position
-    trackPos++; // increment
-    if ( trackPos > CTRACK.size() - 1 ) trackPos = 0; // wrap around
-    CTRACK[trackPos] += trackColor; // paint
-
+    static word trackPos[2] = {random8(NUM_CONTROLLERS), random8(CTRACK[0].size())}; // current position
+    trackPos[1]++; // increment
+    if ( trackPos[1] > CTRACK[trackPos[0]].size() - 1 ) {
+      trackPos[1] = 0; // wrap around
+      trackPos[0]++;
+      if( trackPos[0] > NUM_CONTROLLERS-1 ) trackPos[0]=0;
+    }
+    CTRACK[trackPos[0]][trackPos[1]] += trackColor; // paint
   }
 
   if ( RUN_LOOPS ) {
-    // send a bright white dot around the big track
-    static CRGBSet CTRACKL(pctrackl[0], NUM_LEDS_LEG * 2); // container, noting that it's instantiated _after_ the setup() has set referencing
-    static CRGBSet CTRACKR(pctrackr[0], NUM_LEDS_LEG * 2); // container, noting that it's instantiated _after_ the setup() has set referencing
-    static CRGBSet CTRACKT(pctrackt[0], NUM_LEDS_TOP * 4); // container, noting that it's instantiated _after_ the setup() has set referencing
-
     static CHSV lTrackColor = CHSV(HUE_RED, 255, 255); // color choice.  bright red.
     static CHSV rTrackColor = CHSV(HUE_GREEN, 255, 255); // color choice.  bright green.
     static CHSV tTrackColor = CHSV(HUE_BLUE, 255, 255); // color choice.  bright blue.
 
-    static word lTrackPos = random8(CTRACKL.size()); // current position
-    static word rTrackPos = random8(CTRACKR.size()); // current position
-    static word tTrackPos = random8(CTRACKT.size()); // current position
+    static word lTrackPos[2] = {random8(NUM_CONTROLLERS/2), random8(CTRACKL[0].size())}; // current position
+    static word rTrackPos[2] = {random8(NUM_CONTROLLERS/2), random8(CTRACKR[0].size())}; // current position
+    static word tTrackPos[2] = {random8(NUM_CONTROLLERS*2), random8(CTRACKT[0].size())}; // current position
 
-    lTrackPos++; // increment
-    if ( lTrackPos > CTRACKL.size() - 1 ) lTrackPos = 0; // wrap around
-    CTRACKL[lTrackPos] += lTrackColor; // paint
+    lTrackPos[1]++; // increment
+    if ( lTrackPos[1] > CTRACKL[lTrackPos[0]].size() - 1 ) {
+      lTrackPos[1] = 0; // wrap around
+      lTrackPos[0]++;
+      if( lTrackPos[0] > NUM_CONTROLLERS/2-1 ) lTrackPos[0]=0;
+    }
+    rTrackPos[1]++; // increment
+    if ( rTrackPos[1] > CTRACKR[rTrackPos[0]].size() - 1 ) {
+      rTrackPos[1] = 0; // wrap around
+      rTrackPos[0]++;
+      if( rTrackPos[0] > NUM_CONTROLLERS/2-1 ) rTrackPos[0]=0;
+    }
+    tTrackPos[1]++; // increment
+    if ( tTrackPos[1] > CTRACKT[tTrackPos[0]].size() - 1 ) {
+      tTrackPos[1] = 0; // wrap around
+      tTrackPos[0]++;
+      if( tTrackPos[0] > NUM_CONTROLLERS-1 ) tTrackPos[0]=0;
+    }
 
-    rTrackPos++; // increment
-    if ( rTrackPos > CTRACKR.size() - 1 ) rTrackPos = 0; // wrap around
-    CTRACKR[rTrackPos] += rTrackColor; // paint
-
-    tTrackPos++; // increment
-    if ( tTrackPos > CTRACKT.size() - 1 ) tTrackPos = 0; // wrap around
-    CTRACKT[tTrackPos] += tTrackColor; // paint
+    CTRACKL[lTrackPos[0]][lTrackPos[1]] += lTrackColor; // paint
+    CTRACKR[rTrackPos[0]][rTrackPos[1]] += rTrackColor; // paint
+    CTRACKT[tTrackPos[0]][tTrackPos[1]] += tTrackColor; // paint
   }
 
   if ( DEBUG_CONTROLLERS ) {
     static int controller = 0;
     switch ( controller ) {
-      case 0: C0r[0]=CHSV(HUE_BLUE, 0, 64); break;
-      case 1: C1r[0]=CHSV(HUE_BLUE, 0, 64); break;
-      case 2: C2r[0]=CHSV(HUE_BLUE, 0, 64); break;
-      case 3: C3r[0]=CHSV(HUE_BLUE, 0, 64); break;
+      case 0: C0r[0]+=CHSV(HUE_BLUE, 0, 64); break;
+      case 1: C1r[0]+=CHSV(HUE_BLUE, 0, 64); break;
+      case 2: C2r[0]+=CHSV(HUE_BLUE, 0, 64); break;
+      case 3: C3r[0]+=CHSV(HUE_BLUE, 0, 64); break;
     }
 
     EVERY_N_SECONDS( 1 ) {
